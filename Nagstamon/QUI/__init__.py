@@ -99,6 +99,8 @@ if OS == OS_MACOS:
     from AppKit import (NSApp,
                         NSApplicationPresentationDefault,
                         NSApplicationPresentationHideDock)
+    from mac_notifications import client as osx_notification_client
+
 
 # check ECP authentication support availability
 try:
@@ -2074,7 +2076,13 @@ class StatusWindow(QWidget):
             # due to mysterious DBus-Crashes
             # see https://github.com/HenriWahl/Nagstamon/issues/320
             try:
-                dbus_connection.show(AppInfo.NAME, message)
+                if OS in OS_MACOS:
+                    osx_notification_client.create_notification(
+                        title="alert-from-prometheus",
+                        subtitle=message
+                    )
+                else:
+                    dbus_connection.show(AppInfo.NAME, message)
             except Exception:
                 traceback.print_exc(file=sys.stdout)
 
@@ -2345,9 +2353,13 @@ class StatusWindow(QWidget):
                 # desktop notification
                 if conf.notification_desktop:
                     # get status count from servers
+                    osx_notification_client.create_notification(
+                        title="alert-from-prometheus",
+                        subtitle="hello"
+                    )
                     current_status_count = get_status_count()
-                    if current_status_count != self.status_count:
-                        self.desktop_notification.emit(current_status_count)
+                    #if current_status_count != self.status_count:
+                    #self.desktop_notification.emit(current_status_count)
                     # store status count for next comparison
                     self.status_count = current_status_count
                     del (current_status_count)
@@ -4856,8 +4868,8 @@ class Dialog_Settings(Dialog):
         self.window.button_play_down.clicked.connect(self.play_sound_file_down)
 
         # only show desktop notification on systems that support it
-        if not dbus_connection.connected:
-            self.window.input_checkbox_notification_desktop.hide()
+        #if not dbus_connection.connected:
+        #    self.window.input_checkbox_notification_desktop.hide()
 
         # set folder and play symbols to choose and play buttons
         self.window.button_choose_warning.setText('')

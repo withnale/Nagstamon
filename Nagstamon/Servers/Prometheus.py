@@ -95,6 +95,8 @@ class PrometheusServer(GenericServer):
         GenericServer.init_HTTP(self)
 
         # prepare for JSON
+        if self.session.headers is None:
+            self.session.headers = {}
         self.session.headers.update({'Accept': 'application/json',
                                      'Content-Type': 'application/json'})
 

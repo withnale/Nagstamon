@@ -1425,7 +1425,7 @@ class GenericServer(object):
         # return True if all worked well
         return Result()
 
-    def FetchURL(self, url, giveback='obj', cgi_data=None, no_auth=False, multipart=False):
+    def FetchURL(self, url, giveback='obj', cgi_data=None, no_auth=True, multipart=False):
         '''
             get content of given url, cgi_data only used if present
             'obj' FetchURL gives back a dict full of miserable hosts/services,
