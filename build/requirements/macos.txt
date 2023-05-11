@@ -2,7 +2,6 @@ arrow
 beautifulsoup4
 keyring
 lxml
-#macos-notifications
 psutil
 pyinstaller
 pyobjc-framework-ApplicationServices
@@ -15,3 +14,5 @@ requests-ecp
 # gssapi instead kerberos
 requests-gssapi
 setuptools
+aquaui
+desktop-notifier

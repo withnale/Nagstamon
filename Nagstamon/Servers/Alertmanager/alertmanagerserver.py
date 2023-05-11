@@ -191,12 +191,11 @@ class AlertmanagerServer(GenericServer):
 
         # get all alerts from the API server
         try:
+            url = self.monitor_url + self.API_PATH_ALERTS
             if self.alertmanager_filter != '':
-                result = self.FetchURL(self.monitor_url + self.API_PATH_ALERTS + self.API_FILTERS
-                                        + self.alertmanager_filter, giveback="raw")
-            else:
-                result = self.FetchURL(self.monitor_url + self.API_PATH_ALERTS,
-                                       giveback="raw")
+                filter_list = list(map(lambda x: 'filter=' + x, self.alertmanager_filter.split(',')))
+                url += '?' + '&'.join(filter_list)
+            result = self.FetchURL(url, giveback="raw")
 
             if result.status_code == 200:
                 log.debug("received status code '%s' with this content in result.result: \n\

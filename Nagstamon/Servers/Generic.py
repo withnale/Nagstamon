@@ -103,6 +103,13 @@ class BearerAuth(requests.auth.AuthBase):
         r.headers["Authorization"] = "Bearer " + self.token
         return r
 
+class NoneAuth(requests.auth.AuthBase):
+    def __init__(self):
+        pass
+    def __call__(self, r):
+        return r
+
+
 class GenericServer(object):
 
     '''
@@ -316,6 +323,8 @@ class GenericServer(object):
             session.auth = HTTPECPAuth(self.idp_ecp_endpoint, username=self.username, password=self.password)
         elif self.authentication == 'kerberos':
             session.auth = HTTPSKerberos()
+        elif self.authentication == 'none':
+            session.auth = NoneAuth()
         elif self.authentication == 'bearer':
             session.auth = BearerAuth(self.password)
 
@@ -1405,7 +1414,7 @@ class GenericServer(object):
             for service in host.services.values():
                 # same for services of host
                 if service.visible:
-                    self.events_current[service.get_hash()] = True
+                    self.events_current[service.get_hash()] = service
 
         # check if some cached event still is relevant - kick it out if not
         for event in list(self.events_history.keys()):
@@ -1417,7 +1426,7 @@ class GenericServer(object):
         for event in list(self.events_current.keys()):
             if event not in self.events_history.keys() and conf.highlight_new_events:
                 self.events_history[event] = True
-                self.events_notification[event] = True
+                self.events_notification[event] = self.events_current[event]
 
         # after all checks are done unset checking flag
         self.isChecking = False

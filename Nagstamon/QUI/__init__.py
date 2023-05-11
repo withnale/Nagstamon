@@ -30,6 +30,9 @@ import sys
 import time
 import traceback
 from urllib.parse import quote
+import logging
+
+logger = logging.getLogger(__name__)
 
 # for details of imports look into qt.py
 from .qt import *
@@ -99,7 +102,7 @@ if OS == OS_MACOS:
     from AppKit import (NSApp,
                         NSApplicationPresentationDefault,
                         NSApplicationPresentationHideDock)
-    from mac_notifications import client as osx_notification_client
+    from Nagstamon.local_mac_notify import mac_notify
 
 
 # check ECP authentication support availability
@@ -1359,7 +1362,7 @@ class StatusWindow(QWidget):
             if not conf.servers[server.name].save_password and \
                     not conf.servers[server.name].use_autologin and \
                     conf.servers[server.name].password == '' and \
-                    not conf.servers[server.name].authentication == 'kerberos':
+                    not conf.servers[server.name].authentication in ['kerberos', 'none']:
                 dialogs.authentication.show_auth_dialog(server.name)
 
             # without parent there is some flickering when starting
@@ -2077,10 +2080,7 @@ class StatusWindow(QWidget):
             # see https://github.com/HenriWahl/Nagstamon/issues/320
             try:
                 if OS in OS_MACOS:
-                    osx_notification_client.create_notification(
-                        title="alert-from-prometheus",
-                        subtitle=message
-                    )
+                    mac_notify("alert-from-prometheus", message)
                 else:
                     dbus_connection.show(AppInfo.NAME, message)
             except Exception:
@@ -2321,14 +2321,27 @@ class StatusWindow(QWidget):
                                 server.events_notification[event] = False
                     else:
                         for server in get_enabled_servers():
-                            for event in [k for k, v in server.events_notification.items() if v is True]:
-                                custom_action_string = conf.notification_custom_action_string.replace('$EVENT$',
-                                                                                                      '$EVENTS$')
-                                custom_action_string = custom_action_string.replace('$EVENTS$', event)
-                                # execute action
-                                self.execute_action(server_name, custom_action_string)
-                                # clear already notified events setting them to False
-                                server.events_notification[event] = False
+                            for event_key, event in server.events_notification.items():
+                                try:
+                                    if event is False:
+                                        continue
+                                    if conf.notification_custom_action_string == '__notify__':
+                                        if event is True:
+                                            mac_notify(title="Alert", subtitle=event_key)
+                                        else:
+                                            labels = event.labels
+                                            title = f'{labels.get("alertname", "unknown")} - {labels.get("source", "unknown")}'
+                                            subtitle = event.status_information
+                                            mac_notify(title=title, subtitle=subtitle)
+                                    custom_action_string = conf.notification_custom_action_string.replace('$EVENT$',
+                                                                                                          '$EVENTS$')
+                                    custom_action_string = custom_action_string.replace('$EVENTS$', event_key)
+                                    # execute action
+                                    self.execute_action(server_name, custom_action_string)
+                                    # clear already notified events setting them to False
+                                    server.events_notification[event_key] = False
+                                except Exception as ex:
+                                    logger.exception(ex)
 
                     # if events got filled display them now
                     if events_string != '':
@@ -2353,10 +2366,7 @@ class StatusWindow(QWidget):
                 # desktop notification
                 if conf.notification_desktop:
                     # get status count from servers
-                    osx_notification_client.create_notification(
-                        title="alert-from-prometheus",
-                        subtitle="hello"
-                    )
+                    #mac_notify(title="Hello world!", subtitle="Sent from Python")
                     current_status_count = get_status_count()
                     #if current_status_count != self.status_count:
                     #self.desktop_notification.emit(current_status_count)
@@ -5834,7 +5844,7 @@ class Dialog_Server(Dialog):
         self.window.button_choose_custom_cert_ca_file.clicked.connect(self.choose_custom_cert_ca_file)
 
         # fill authentication combobox
-        self.window.input_combobox_authentication.addItems(['Basic', 'Digest', 'Kerberos', 'Bearer'])
+        self.window.input_combobox_authentication.addItems(['None', 'Basic', 'Digest', 'Kerberos', 'Bearer'])
         if ECP_AVAILABLE is True:
             self.window.input_combobox_authentication.addItems(['ECP'])
 
@@ -5866,7 +5876,7 @@ class Dialog_Server(Dialog):
         """
             when authentication is changed to Kerberos then disable username/password as the are now useless
         """
-        if self.window.input_combobox_authentication.currentText() == 'Kerberos':
+        if self.window.input_combobox_authentication.currentText() in ['Kerberos', 'None']:
             for widget in self.AUTHENTICATION_WIDGETS:
                 widget.hide()
         else:
