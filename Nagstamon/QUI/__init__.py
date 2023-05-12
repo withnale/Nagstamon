@@ -741,7 +741,6 @@ class ComboBox_Servers(QComboBox):
             fill default order fields combobox with server names
         """
         self.clear()
-        self.addItem('Go to monitor...')
         self.addItems(sorted([x.name for x in conf.servers.values() if x.enabled], key=str.lower))
 
     @Slot()
@@ -2327,17 +2326,20 @@ class StatusWindow(QWidget):
                                         continue
                                     if conf.notification_custom_action_string == '__notify__':
                                         if event is True:
-                                            mac_notify(title="Alert", subtitle=event_key)
+                                            logger.info(f'Received a boolean event {event_key}')
                                         else:
                                             labels = event.labels
-                                            title = f'{labels.get("alertname", "unknown")} - {labels.get("source", "unknown")}'
-                                            subtitle = event.status_information
-                                            mac_notify(title=title, subtitle=subtitle)
-                                    custom_action_string = conf.notification_custom_action_string.replace('$EVENT$',
+                                            logger.info(f'Received an event with labels={labels}')
+                                            if labels.get('notify', None):
+                                                title = f'{labels.get("alertname", "unknown")} - {labels.get("source", "unknown")}'
+                                                subtitle = event.status_information
+                                                mac_notify(title=title, subtitle=subtitle)
+                                    else:
+                                        custom_action_string = conf.notification_custom_action_string.replace('$EVENT$',
                                                                                                           '$EVENTS$')
-                                    custom_action_string = custom_action_string.replace('$EVENTS$', event_key)
-                                    # execute action
-                                    self.execute_action(server_name, custom_action_string)
+                                        custom_action_string = custom_action_string.replace('$EVENTS$', event_key)
+                                        # execute action
+                                        self.execute_action(server_name, custom_action_string)
                                     # clear already notified events setting them to False
                                     server.events_notification[event_key] = False
                                 except Exception as ex:
