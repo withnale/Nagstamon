@@ -163,6 +163,7 @@ class AlertmanagerServer(GenericServer):
         result['generatorURL'] = generator_url
         result['fingerprint'] = fingerprint
         result['status_information'] = status_information
+        result['annotations'] = annotations
 
         return result
 
@@ -229,6 +230,8 @@ class AlertmanagerServer(GenericServer):
                 service.server = alert_data['server']
                 service.status = alert_data['status']
                 service.labels = alert_data['labels']
+                service.annotations = alert_data['annotations']
+
                 service.scheduled_downtime = alert_data['scheduled_downtime']
                 service.acknowledged = alert_data['acknowledged']
                 service.last_check = alert_data['last_check']

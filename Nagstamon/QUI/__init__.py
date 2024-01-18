@@ -3464,6 +3464,14 @@ class TreeView(QTreeView):
         # dummy definition to avoid crash if no actions are enabled - asked for some lines later
         miserable_service = None
 
+        dynamic_entries = []
+        for lrow in list_rows:
+            if len(self.model().data_array[lrow]) == 16:
+                source = self.model().data_array[lrow][15]
+                for annotation in source.annotations:
+                    if annotation.startswith('url_'):
+                        dynamic_entries.append(annotation)
+
         # Add custom actions if all selected rows want them, one per one
         for a in actions_list:
             # shortcut for next lines
@@ -3573,6 +3581,16 @@ class TreeView(QTreeView):
         self.action_menu.addAction(action_edit_actions)
         # put actions into menu after separator
 
+        if dynamic_entries:
+            self.action_menu.addSeparator()
+            for entry in dynamic_entries:
+                action_menuentry = QAction(entry[4:], self)
+                # add action
+                self.action_menu.addAction(action_menuentry)
+                # action to signalmapper
+                self.signalmapper_action_menu.setMapping(action_menuentry, f"dynamic:{entry}")
+                action_menuentry.triggered.connect(self.signalmapper_action_menu.map)
+
         self.action_menu.addSeparator()
         if 'Monitor' in self.server.MENU_ACTIONS and len(list_rows) == 1:
             action_monitor = QAction('Monitor', self)
@@ -3637,25 +3655,36 @@ class TreeView(QTreeView):
             comment_down = conf.defaults_downtime_comment
             comment_submit = conf.defaults_submit_check_result_comment
 
+            info_block = {'server': server,
+                          'host': miserable_host,
+                          'service': miserable_service,
+                          'status-info': miserable_status_info,
+                          'address': address,
+                          'monitor': monitor,
+                          'monitor-cgi': monitor_cgi,
+                          'username': username,
+                          'password': password,
+                          'comment-ack': comment_ack,
+                          'comment-down': comment_down,
+                          'comment-submit': comment_submit
+                          }
+            try:
+                info_block['alert'] = self.model().data(self.model().createIndex(lrow, 15), Qt.ItemDataRole.DisplayRole)
+            except IndexError:
+                pass
+
             # send dict with action info and dict with host/service info
-            self.request_action.emit(conf.actions[action].__dict__,
-                                     {'server': server,
-                                      'host': miserable_host,
-                                      'service': miserable_service,
-                                      'status-info': miserable_status_info,
-                                      'address': address,
-                                      'monitor': monitor,
-                                      'monitor-cgi': monitor_cgi,
-                                      'username': username,
-                                      'password': password,
-                                      'comment-ack': comment_ack,
-                                      'comment-down': comment_down,
-                                      'comment-submit': comment_submit
-                                      }
-                                     )
+            if action.startswith('dynamic:'):
+                conf_action = Action()
+                annotation_name = action[8:]
+                conf_action.string = info_block['alert'].annotations[annotation_name]
+            else:
+                conf_action = conf.actions.get(action)
+
+            self.request_action.emit(conf_action.__dict__, info_block)
 
             # if action wants a closed status window it should be closed now
-            if conf.actions[action].close_popwin and not conf.fullscreen and not conf.windowed:
+            if conf_action.close_popwin and not conf.fullscreen and not conf.windowed:
                 statuswindow.hide_window()
 
         # clean up
@@ -4194,6 +4223,8 @@ class TreeView(QTreeView):
                                     self.info['services_flags_column_needed'] = True
 
                                 self.data_array[-1].append('X')
+                                # Make item available in the data model
+                                self.data_array[-1].append(item)
 
                 # sort data before it gets transmitted to treeview model
                 self.sort_data_array(self.sort_column, self.sort_order, False)
@@ -4397,6 +4428,9 @@ class TreeView(QTreeView):
 
                 # take string form action
                 string = action['string']
+                if info.get('alert'):
+                    string = action['string'].format(
+                        labels=info['alert'].labels, annotations=info['alert'].annotations)
 
                 # mapping mapping
                 for i in mapping:
